@@ -5,6 +5,8 @@ import 'webrtc-adapter';
 import SIP from 'sip.js';
 import once from './utils/once';
 
+import Interop from 'sdp-interop-sl';
+
 import CallbacksHandler from './utils/CallbacksHandler';
 import MobileSessionDescriptionHandler from './lib/MobileSessionDescriptionHandler';
 
@@ -67,16 +69,42 @@ export default class WebRTCClient {
     return regex.exec(ip) == null;
   }
 
+  static isChrome() {
+    if (!this._isWeb()) { return false; }
+
+    const isOpera = !!window.opera || !!window.opr;
+    let isChrome = !!window.chrome && !isOpera;
+
+    if (isChrome) {
+      isChrome = this._getChromeVersion();
+
+      if (isChrome.major > 70) {
+        isChrome = false;
+      }
+    }
+  }
+
+  _getChromeVersion () {
+    var pieces = navigator.userAgent.match(/Chrom(?:e|ium)\/([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)/);
+    if (pieces == null || pieces.length != 5) {
+        return undefined;
+    }
+    pieces = pieces.map(piece => parseInt(piece, 10));
+    return {
+        major: pieces[1],
+        minor: pieces[2],
+        build: pieces[3],
+        patch: pieces[4]
+    };
+  }
+
   static getIceServers(ip: string): Array<{ urls: Array<string> }> {
     if (WebRTCClient.isAPrivateIp(ip)) {
       return [
         {
           urls: [
             'stun:stun.l.google.com:19302',
-            'stun:stun1.l.google.com:19302',
-            'stun:stun2.l.google.com:19302',
-            'stun:stun3.l.google.com:19302',
-            'stun:stun4.l.google.com:19302'
+            'stun:stun1.l.google.com:19302'
           ]
         }
       ];
@@ -90,6 +118,7 @@ export default class WebRTCClient {
 
     this.configureMedia(config.media);
     this.userAgent = this.createUserAgent();
+    this.interop = new Interop();
   }
 
   configureMedia(media: MediaConfig) {
@@ -99,6 +128,17 @@ export default class WebRTCClient {
     this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
     this.audioStreams = {};
     this.audioElements = {};
+  }
+
+  sdpAdapter(description) {
+    if (!isChrome) { return Promise.resolve(description); }
+
+    if (description.originator === 'local') {
+      description = this.interop.toUnifiedPlan(description);
+    } else {
+      description = this.interop.toPlanB(description);
+    }
+    return Promise.resolve(description);
   }
 
   createUserAgent(): SIP.UA {
@@ -147,7 +187,7 @@ export default class WebRTCClient {
   }
 
   call(number: string): SIP.InviteClientContext {
-    const context = this.userAgent.invite(number, this._getMediaConfiguration());
+    const context = this.userAgent.invite(number, this._getMediaConfiguration(), this.sdpAdapter);
 
     this._setupSession(context);
 
