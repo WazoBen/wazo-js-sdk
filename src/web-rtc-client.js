@@ -280,6 +280,17 @@ export default class WebRTCClient {
     return bindStreams(pc.getRemoteStreams()[0]);
   }
 
+  createOffer(session: SIP.InviteClientContext) {
+    const pc = session.sessionDescriptionHandler.peerConnection;
+
+    const options = {
+      ...this._getRtcOptions(),
+      iceRestart: true,
+    };
+
+    return pc.createOffer(options).then(offer => pc.setLocalDescription(offer));
+  };
+
   removeFromMerge(session: SIP.InviteClientContext, shouldHold: boolean = true) {
     const sdh = session.sessionDescriptionHandler;
     const pc = sdh.peerConnection;
