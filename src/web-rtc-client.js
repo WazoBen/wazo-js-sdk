@@ -3,6 +3,7 @@
 /* global window, document, navigator */
 import 'webrtc-adapter';
 import SIP from 'sip.js';
+import ReactSessionDescriptionHandler from 'sip.js/lib/React/SessionDescriptionHandler';
 import once from './utils/once';
 
 import CallbacksHandler from './utils/CallbacksHandler';
@@ -444,7 +445,7 @@ export default class WebRTCClient {
 
     // Use custom SessionDescription handler for mobile
     if (!this._isWeb()) {
-      config.sessionDescriptionHandlerFactory = MobileSessionDescriptionHandler(SIP).defaultFactory;
+      config.sessionDescriptionHandlerFactory = ReactSessionDescriptionHandler.defaultFactory;
       config.registerOptions = {
         extraContactHeaderParams: ['mobility=mobile']
       };
